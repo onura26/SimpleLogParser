@@ -112,7 +112,7 @@ Total Matches: 4
 - [x] Version 1.1 - Case-insensitive search, regex support
 - [x] Version 1.2 - Date range filtering
 - [x] Version 1.3 - Context lines & log format support
-- [ ] Version 1.4
+- [x] Version 1.4 - Zero allocation optimization, major bug fixes
 - [ ] Version 1.5
 - [ ] Version 1.6
 - [ ] Version 1.7

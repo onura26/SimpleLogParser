@@ -13,6 +13,8 @@ constexpr const char* GREEN_COLOR = "\033[32m";
 constexpr const char* BLUE_COLOR = "\033[34m";
 constexpr const char* RESET_COLOR = "\033[0m";
 
+constexpr std::string_view PROGRAM_VERSION {"v1.4"};
+
 enum class LogLevel {
     FATAL,
     ERROR,
@@ -22,7 +24,6 @@ enum class LogLevel {
     UNKNOWN
 };
 
-// Define the struct FIRST, before using it
 struct LogLevelConfig {
     std::vector<std::string> fatalKeywords;
     std::vector<std::string> errorKeywords;
@@ -31,7 +32,6 @@ struct LogLevelConfig {
     std::vector<std::string> debugKeywords;
 };
 
-// NOW you can use it in the namespace
 namespace LogFormats {
     inline const LogLevelConfig GENERIC = {
         {"fatal", "critical", "emergency", "alert"},
@@ -70,7 +70,11 @@ inline const LogLevelConfig& DEFAULT_LOG_LEVEL_CONFIG = LogFormats::GENERIC;
 
 // Utility Functions
 LogLevel detect_log_level(const std::string& line, const LogLevelConfig& config);
+
 const char* get_log_level_color(LogLevel level);
+
 std::string to_lower(const std::string& str);
+
+bool contains_case_insensitive(std::string_view haystack, std::string_view needle);
 
 #endif // UTILS_H

@@ -39,7 +39,7 @@ ProgramOptions parse_arguments(int argc, char* argv[])
             {
                 throw std::runtime_error("Missing value after -from flag.");
             }
-            std::string dateStr = argv[++i];
+            std::string dateStr {argv[++i]};
             auto frmt = detect_date_format(dateStr);
             auto parsed = parse_log_timestamp(dateStr, frmt);
             if (!parsed)
@@ -55,7 +55,7 @@ ProgramOptions parse_arguments(int argc, char* argv[])
             {
                 throw std::runtime_error("Missing value after -to flag.");
             }
-            std::string dateStr = argv[++i];
+            std::string dateStr {argv[++i]};
             auto frmt = detect_date_format(dateStr);
             auto parsed = parse_log_timestamp(dateStr, frmt);
             if (!parsed)
@@ -71,7 +71,7 @@ ProgramOptions parse_arguments(int argc, char* argv[])
             {
                 throw std::runtime_error("Missing value after -f/--log-format flag.");
             }
-            std::string formatStr = argv[++i];
+            std::string formatStr {argv[++i]};
             if (formatStr == "generic") options.logFormat = LogFormats::GENERIC;
             else if (formatStr == "syslog") options.logFormat = LogFormats::SYSLOG;
             else if (formatStr == "java") options.logFormat = LogFormats::JAVA;
@@ -92,6 +92,7 @@ ProgramOptions parse_arguments(int argc, char* argv[])
             try
             {
                 options.afterContext = std::stoi(argv[++i]);
+                
                 if (options.afterContext < 0)
                 {
                     throw std::runtime_error("After context (-A) value must be non-negative.");
@@ -114,6 +115,7 @@ ProgramOptions parse_arguments(int argc, char* argv[])
             try
             {
                 options.beforeContext = std::stoi(argv[++i]);
+                
                 if (options.beforeContext < 0)
                 {
                     throw std::runtime_error("Before context (-B) value must be non-negative.");
@@ -136,16 +138,12 @@ ProgramOptions parse_arguments(int argc, char* argv[])
             try
             {
                 int contextValue {std::stoi(argv[++i])};
+
                 if (contextValue < 0)
-                {
                     throw std::runtime_error("Context (-C) value must be non-negative.");
-                    if (contextValue < 0)
-                    {
-                        throw std::runtime_error("Context (-C) value must be non-negative.");
-                    }
-                    options.beforeContext = contextValue;
-                    options.afterContext = contextValue;
-                }
+                
+                options.beforeContext = contextValue;
+                options.afterContext = contextValue;
             }
 
             catch (const std::exception&)
@@ -180,9 +178,6 @@ ProgramOptions parse_arguments(int argc, char* argv[])
             }
         }
     }
-
-    // Optimization Update: Pre-detect date format from the log file
-    options.detectedDateFormat = detect_date_format_from_file(options.inputFilePath);
 
     return options;
 }

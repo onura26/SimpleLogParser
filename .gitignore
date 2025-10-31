@@ -18,4 +18,9 @@ bin/
 # Test logs (keep sample)
 *.log
 !sample_log_file.txt
+!sample_log_file_10gb.txt
+!sample_log_file_200mb.txt
+!sample_log_file_long.txt
 output.txt
+*.txt
+sample_log_file_10gb.txt

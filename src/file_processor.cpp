@@ -51,22 +51,12 @@ int search_in_file(const ProgramOptions& options)
         throw std::runtime_error("Failed to open file: " + options.inputFilePath);
     }
 
-    // Precompute lowercase patterns if case insensitive
-    std::vector<std::string> lowerCasePatterns;
-    if (options.caseInsensitive && !options.useRegex)
-    {
-        lowerCasePatterns.reserve(options.searchPatterns.size());
-
-        for (const auto& pattern : options.searchPatterns)
-        {
-            lowerCasePatterns.push_back(to_lower(pattern));
-        }
-    }
-
     // Compile regex patterns if needed
     std::vector<std::regex> regexPatterns;
     if (options.useRegex)
     {
+        regexPatterns.reserve(options.searchPatterns.size());
+
         for (const auto& pattern : options.searchPatterns)
         {
             regexPatterns.emplace_back(pattern, options.caseInsensitive ? std::regex::icase : std::regex::ECMAScript);
@@ -84,35 +74,42 @@ int search_in_file(const ProgramOptions& options)
     bool needsSeparator {false}; // Separator flag 
 
     std::string line;
-    int matchCount = 0;
-    int lineNumber = 0;
-    int linesWithTimestamps = 0;
+    int matchCount {0};
+    int lineNumber {0};
+    int linesWithTimestamps {0};
+    LogDateFormat dateFormat {LogDateFormat::UNKNOWN};
 
-    // Optimization Update: Use pre-detected date format
-    LogDateFormat dateFormat = options.detectedDateFormat;
-
-    constexpr const char* CONTEXT_COLOR = "\033[2m]"; // dim 
+    constexpr const char* CONTEXT_COLOR = "\033[2m"; // dim 
 
     while (std::getline(inputFile, line))
     {
         ++lineNumber;
+
+        // Detect format without double file open
+        if (dateFormat == LogDateFormat::UNKNOWN && line.size() >= TIMESTAMP_PREFIX_LENGTH)
+        {
+            std::string_view prefix(line.data(), TIMESTAMP_PREFIX_LENGTH);
+            dateFormat = detect_date_format(std::string(prefix));
+        }
 
         // Date range filtering
         auto ts = extract_timestamp(line, dateFormat);
         if (ts)
         {
             ++linesWithTimestamps;
+
             if (options.fromTime && *ts < *(options.fromTime))
             {
                 continue; // Skip lines before fromTime
             }
+
             if (options.toTime && *ts > *(options.toTime))
             {
                 continue; // Skip lines after toTime
             }
         }
 
-        bool found = false;
+        bool found {false};
 
         if (options.useRegex)
         {
@@ -127,14 +124,16 @@ int search_in_file(const ProgramOptions& options)
             }
         }
 
-        else
+        else 
         {
-            const std::string searchLine = options.caseInsensitive ? to_lower(line) : line;
-            const auto& patternsToUse = options.caseInsensitive ? lowerCasePatterns : options.searchPatterns;
-
-            for (const auto& pattern : patternsToUse)
+            // Walk and compare
+            for (const auto& pattern : options.searchPatterns)
             {
-                if (searchLine.find(pattern) != std::string::npos)
+                bool match = options.caseInsensitive 
+                    ? contains_case_insensitive(line, pattern) 
+                    : (line.find(pattern) != std::string::npos);
+
+                if (match)
                 {
                     found = true;
                     break;
@@ -192,6 +191,7 @@ int search_in_file(const ProgramOptions& options)
                 std::cout << CONTEXT_COLOR << "[C:L" << lineNumber << "] " << line << RESET_COLOR << '\n';
                 lastPrintedLine = lineNumber;
             }
+            
             --afterContextRemaining; // Decrement counter 
         }
 

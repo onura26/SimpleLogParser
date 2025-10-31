@@ -5,41 +5,38 @@
 
 LogLevel detect_log_level(const std::string& line, const LogLevelConfig& config)
 {
-    std::string lowerLine = to_lower(line);
-
     for (const auto& keyword : config.fatalKeywords) {
-        if (lowerLine.find(keyword) != std::string::npos) {
+        if (contains_case_insensitive(line, keyword)) {
             return LogLevel::FATAL;
         }
     }
 
     for (const auto& keyword : config.errorKeywords) {
-        if (lowerLine.find(keyword) != std::string::npos) {
+        if (contains_case_insensitive(line, keyword)) {
             return LogLevel::ERROR;
         }
     }
 
     for (const auto& keyword : config.warningKeywords) {
-        if (lowerLine.find(keyword) != std::string::npos) {
+        if (contains_case_insensitive(line, keyword)) {
             return LogLevel::WARNING;
         }
     }
 
     for (const auto& keyword : config.infoKeywords) {
-        if (lowerLine.find(keyword) != std::string::npos) {
+        if (contains_case_insensitive(line, keyword)) {
             return LogLevel::INFO;
         }
     }
 
     for (const auto& keyword : config.debugKeywords) {
-        if (lowerLine.find(keyword) != std::string::npos) {
+        if (contains_case_insensitive(line, keyword)) {
             return LogLevel::DEBUG;
         }
     }
 
     return LogLevel::UNKNOWN;
 }
-
 
 const char* get_log_level_color(LogLevel level)
 {
@@ -66,4 +63,13 @@ std::string to_lower(const std::string& str)
                    [](unsigned char c){ return std::tolower(c); });
     
     return result;
+}
+
+bool contains_case_insensitive(std::string_view haystack, std::string_view needle)
+{
+    auto it = std::search(haystack.begin(), haystack.end(), 
+                        needle.begin(), needle.end(), 
+                        [](char ch1, char ch2) { return std::tolower(ch1) == std::tolower(ch2); });
+
+    return it != haystack.end();
 }

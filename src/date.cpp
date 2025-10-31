@@ -32,11 +32,13 @@ LogDateFormat detect_date_format(const std::string& dateStr)
 }
 
 // Parse log timestamp based on detected format
-std::optional<std::chrono::system_clock::time_point> parse_log_timestamp(const std::string& dateStr, LogDateFormat format)
+std::optional<std::chrono::system_clock::time_point> parse_log_timestamp(std::string_view dateStr, LogDateFormat format)
 {
     // Initialize a tm structure to hold parsed time components
     std::tm tm = {};
-    std::istringstream ss(dateStr); // Input string stream for parsing
+    
+    std::string dateString(dateStr); 
+    std::istringstream ss(dateString); // Input string stream for parsing
 
     switch (format)
     {
@@ -60,45 +62,33 @@ std::optional<std::chrono::system_clock::time_point> parse_log_timestamp(const s
     // Fix: UTC compatibility
     tm.tm_isdst = -1; // Let mktime determine if DST is in effect
     
+    time_t utcTime {0};
+
+#if defined(_WIN32)
+    // Emulate _mkgmtime() for Windows
+    utcTime = _mkgmtime(&tm);
+#else
+    // POSIX (Linux, macOS)
+    utcTime = timegm(&tm);
+#endif
+
     // tm -> time_t conversion and then to time_point
-    return std::chrono::system_clock::from_time_t(std::mktime(&tm));
+    return std::chrono::system_clock::from_time_t(utcTime);
 }
 
 // Extract timestamp from a log line using pre-detected format
 std::optional<std::chrono::system_clock::time_point> extract_timestamp(const std::string& line, LogDateFormat format)
 {
-    // Log timestamp length check
+    // Log timestamp length and format check
     if (line.size() < TIMESTAMP_PREFIX_LENGTH)
         return std::nullopt; 
+    if (format == LogDateFormat::UNKNOWN)
+        return std::nullopt;
 
-    std::string prefix = line.substr(0, TIMESTAMP_PREFIX_LENGTH); // 
+    std::string_view prefix(line.data(), TIMESTAMP_PREFIX_LENGTH);
     
-    // For performance, no more regex detection here - just parse with know format.
+    // For performance, no more regex detection here - just parse with known format.
 
-    return parse_log_timestamp(prefix, format); // Call parsing function
+    return parse_log_timestamp(prefix, format);
 }
 
-// New Function: Detect date format from a log file by reading the first few lines
-LogDateFormat detect_date_format_from_file(const std::string& filePath)
-{
-    std::ifstream file(filePath);
-    if (!file.is_open())
-        return LogDateFormat::UNKNOWN;
-
-    std::string line;
-
-    // Read first few lines to detect format
-    for (int i = 0; i < 100 && std::getline(file, line); ++i)
-    {
-        if (line.size() >= TIMESTAMP_PREFIX_LENGTH)
-        {
-            std::string prefix = line.substr(0, TIMESTAMP_PREFIX_LENGTH);
-            LogDateFormat format = detect_date_format(prefix);
-
-            if (format != LogDateFormat::UNKNOWN)
-                return format; // Return the first detected format
-        }
-    }
-
-    return LogDateFormat::UNKNOWN; 
-}
