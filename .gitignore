@@ -24,3 +24,5 @@ bin/
 output.txt
 *.txt
 sample_log_file_10gb.txt
+sample_log_file_200mb.txt
+*.txt
