@@ -7,6 +7,8 @@
 #include <fstream>
 #include <regex>
 #include <cstdlib>
+#include <print>
+#include <cstdio>
 
 int search_in_file(const ProgramOptions& options)
 {
@@ -131,7 +133,7 @@ int search_in_file(const ProgramOptions& options)
             {
                 bool match = options.caseInsensitive 
                     ? contains_case_insensitive(line, pattern) 
-                    : (line.find(pattern) != std::string::npos);
+                    : line.contains(pattern);
 
                 if (match)
                 {
@@ -147,7 +149,7 @@ int search_in_file(const ProgramOptions& options)
             // Ex: Match at line 10, last printed line was 7, need separator
             if (needsSeparator && lastPrintedLine != -1 && lineNumber - lastPrintedLine > 1)
             {
-                std::cout << "--\n";
+                std::println("--");
             }
 
             // Step 2: Dump ring buffer (before context)
@@ -159,7 +161,7 @@ int search_in_file(const ProgramOptions& options)
                 if (bufLineNum > lastPrintedLine)
                 {
                     // Ex: lastPrintedLine = 10, bufLineNum = 11 -> bufLineNum annexes lastPrintedLine after it was printed
-                    std::cout << CONTEXT_COLOR << "[C:L" << bufLineNum << "] " << bufLine << RESET_COLOR << '\n';
+                    std::println("{}[C:L{}] {}{}", CONTEXT_COLOR, bufLineNum, bufLine, RESET_COLOR);
                     lastPrintedLine = bufLineNum;
                 }
             }
@@ -167,7 +169,7 @@ int search_in_file(const ProgramOptions& options)
             // Step 3: Print the actual matching line (colored by log level)
             LogLevel level = detect_log_level(line, options.logFormat);
             auto color = get_log_level_color(level);
-            std::cout << color << "[" << matchCount << ":L" << lineNumber <<"] " << line << RESET_COLOR << '\n';
+            std::println("{}[{}:L{}] {}{}", color, matchCount, lineNumber, line, RESET_COLOR);
             lastPrintedLine = lineNumber;
             ++matchCount;
 
@@ -188,7 +190,7 @@ int search_in_file(const ProgramOptions& options)
             // After context processing
             if (lineNumber > lastPrintedLine) // Deduplication check
             {
-                std::cout << CONTEXT_COLOR << "[C:L" << lineNumber << "] " << line << RESET_COLOR << '\n';
+                std::println("{}[C:L{}] {}{}", CONTEXT_COLOR, lineNumber, line, RESET_COLOR);
                 lastPrintedLine = lineNumber;
             }
             
@@ -216,10 +218,12 @@ int search_in_file(const ProgramOptions& options)
     // Warn user if date filtering was applied but no timestamps were found
     if ((options.fromTime || options.toTime) && linesWithTimestamps == 0)
     {
-        std::cerr << "\nWarning: Date filtering was requested, but no valid timestamps were found in the log lines.\n";
+        std::println(stderr, "");
+        std::println(stderr, "Warning: Date filtering was requested, but no valid timestamps were found in the log lines.");
     }
 
-    std::cout << "\nTotal Matches: " << matchCount << std::endl;
+    std::println("");
+    std::println("Total Matches: {}", matchCount);
 
     return EXIT_SUCCESS;
 }

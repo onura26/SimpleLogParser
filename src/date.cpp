@@ -5,6 +5,7 @@
 #include <regex>
 #include <ctime>
 #include <fstream>
+#include <format>
 
 // Detect the date format based on the input string
 LogDateFormat detect_date_format(const std::string& dateStr)
@@ -32,24 +33,23 @@ LogDateFormat detect_date_format(const std::string& dateStr)
 }
 
 // Parse log timestamp based on detected format
-std::optional<std::chrono::system_clock::time_point> parse_log_timestamp(std::string_view dateStr, LogDateFormat format)
+std::optional<std::chrono::system_clock::time_point> 
+parse_log_timestamp(std::string_view dateStr, LogDateFormat format)
 {
-    // Initialize a tm structure to hold parsed time components
-    std::tm tm = {};
-    
     std::string dateString(dateStr); 
     std::istringstream ss(dateString); // Input string stream for parsing
+    std::chrono::sys_seconds tp;
 
     switch (format)
     {
         case LogDateFormat::YYYY_MM_DD_HH_MM_SS:
-            ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+            ss >> std::chrono::parse("%Y-%m-%d %H:%M:%S", tp);
             break;
         case LogDateFormat::DD_MM_YYYY_HH_MM_SS:
-            ss >> std::get_time(&tm, "%d-%m-%Y %H:%M:%S");
+            ss >> std::chrono::parse("%d-%m-%Y %H:%M:%S", tp);
             break;
         case LogDateFormat::MM_DD_YYYY_HH_MM_SS:
-            ss >> std::get_time(&tm, "%m-%d-%Y %H:%M:%S");
+            ss >> std::chrono::parse("%m-%d-%Y %H:%M:%S", tp);
             break;
         default:
             return std::nullopt; // Unsupported format
@@ -58,22 +58,8 @@ std::optional<std::chrono::system_clock::time_point> parse_log_timestamp(std::st
     // Check if parsing was successful
     if (ss.fail())
         return std::nullopt;
-    
-    // Fix: UTC compatibility
-    tm.tm_isdst = -1; // Let mktime determine if DST is in effect
-    
-    time_t utcTime {0};
 
-#if defined(_WIN32)
-    // Emulate _mkgmtime() for Windows
-    utcTime = _mkgmtime(&tm);
-#else
-    // POSIX (Linux, macOS)
-    utcTime = timegm(&tm);
-#endif
-
-    // tm -> time_t conversion and then to time_point
-    return std::chrono::system_clock::from_time_t(utcTime);
+    return tp;
 }
 
 // Extract timestamp from a log line using pre-detected format

@@ -1,5 +1,5 @@
-CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra
+CXX = g++-14
+CXXFLAGS = -std=c++23 -Wall -Wextra
 TARGET = logparser
 SOURCES = main.cpp $(wildcard src/*.cpp)
 OBJECTS = $(SOURCES:.cpp=.o)
