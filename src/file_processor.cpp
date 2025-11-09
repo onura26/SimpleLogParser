@@ -1,14 +1,6 @@
 // src/file_processor.cpp
 
 #include "file_processor.h"
-#include "utils.h"
-#include "date.h"
-#include <iostream>
-#include <fstream>
-#include <regex>
-#include <cstdlib>
-#include <print>
-#include <cstdio>
 
 int search_in_file(const ProgramOptions& options)
 {
@@ -46,12 +38,41 @@ int search_in_file(const ProgramOptions& options)
     *   [1:L46] ERROR: another match
     */
 
-    std::ifstream inputFile(options.inputFilePath);
-
-    if (!inputFile.is_open())
+    // Open file 
+    int fd = open(options.inputFilePath.c_str(), O_RDONLY);
+    if (fd == -1)
     {
         throw std::runtime_error("Failed to open file: " + options.inputFilePath);
     }
+
+    // Get file size
+    struct stat sb;
+    if (fstat(fd, &sb) == -1)
+    {
+        close(fd);
+        throw std::runtime_error("Failed to get file size");
+    }
+    off_t fileSize {sb.st_size};
+
+    // Empty file check
+    if (fileSize == 0)
+    {
+        close(fd);
+        std::cout << '\n' << "Total matches: 0" << std::endl;
+        return EXIT_SUCCESS;
+    }
+
+    // Memory mapping process
+    // MAP_PRIVATE = Changes won't affect the integrity of file
+    // MAP_POPULATE = Prefetch pages into memory (for better performance)
+    char* fileData {static_cast<char*>(mmap(nullptr, fileSize, PROT_READ, MAP_PRIVATE, fd, 0))};
+    if (fileData == MAP_FAILED)
+    {
+        close(fd);
+        throw std::runtime_error("Memory mapping failed");
+    }
+    madvise(fileData, fileSize, MADV_SEQUENTIAL | MADV_WILLNEED); // Tell OS to read sequentially
+    close(fd);
 
     // Compile regex patterns if needed
     std::vector<std::regex> regexPatterns;
@@ -83,147 +104,161 @@ int search_in_file(const ProgramOptions& options)
 
     constexpr const char* CONTEXT_COLOR = "\033[2m"; // dim 
 
-    while (std::getline(inputFile, line))
+    // Line parser with memchr
+    const char* lineStart {fileData};
+    const char* fileEnd {fileData + fileSize};
+
+    while (lineStart < fileEnd)
     {
+        // Find new line
+        const char* lineEnd {static_cast<const char*>(memchr(lineStart, '\n', fileEnd - lineStart))};
+
+        if (lineEnd == nullptr)
+        {
+            lineEnd = fileEnd;
+        }
+
+        off_t lineLength {lineEnd - lineStart};
+
+        // \r trimming
+        if (lineLength > 0 && lineStart[lineLength - 1] == '\r')
+        {
+            --lineLength;
+        }
+
+        std::string_view lineView(lineStart, lineLength);
         ++lineNumber;
-
+        
         // Detect format without double file open
-        if (dateFormat == LogDateFormat::UNKNOWN && line.size() >= TIMESTAMP_PREFIX_LENGTH)
+        if (dateFormat == LogDateFormat::UNKNOWN && lineView.size() >= TIMESTAMP_PREFIX_LENGTH)
         {
-            std::string_view prefix(line.data(), TIMESTAMP_PREFIX_LENGTH);
-            dateFormat = detect_date_format(std::string(prefix));
+            dateFormat = detect_date_format(std::string(lineView.substr(0, TIMESTAMP_PREFIX_LENGTH)));
         }
 
-        // Date range filtering
-        auto ts = extract_timestamp(line, dateFormat);
-        if (ts)
+        // Date filtering (only create string if we need timestamp)
+        bool skipLine = false;
+        if (options.fromTime || options.toTime)
         {
-            ++linesWithTimestamps;
-
-            if (options.fromTime && *ts < *(options.fromTime))
+            if (lineLength >= TIMESTAMP_PREFIX_LENGTH)
             {
-                continue; // Skip lines before fromTime
-            }
-
-            if (options.toTime && *ts > *(options.toTime))
-            {
-                continue; // Skip lines after toTime
-            }
-        }
-
-        bool found {false};
-
-        if (options.useRegex)
-        {
-            // Use regex search
-            for (const auto& regexPattern : regexPatterns)
-            {
-                if (std::regex_search(line, regexPattern))
-                {
-                    found = true;
-                    break;
-                }
-            }
-        }
-
-        else 
-        {
-            // Walk and compare
-            for (const auto& pattern : options.searchPatterns)
-            {
-                bool match = options.caseInsensitive 
-                    ? contains_case_insensitive(line, pattern) 
-                    : line.contains(pattern);
-
-                if (match)
-                {
-                    found = true;
-                    break;
-                }
-            }
-        }
-
-        if (found)
-        {
-            // Step 1: Print separator between non-contigous matches
-            // Ex: Match at line 10, last printed line was 7, need separator
-            if (needsSeparator && lastPrintedLine != -1 && lineNumber - lastPrintedLine > 1)
-            {
-                std::println("--");
-            }
-
-            // Step 2: Dump ring buffer (before context)
-            // Loop through stored lines in beforeBuffer
-            for (const auto& [bufLineNum, bufLine] : beforeBuffer)
-            {
-                // Deduplication check
-                // If matches are close, avoid re-printing same context lines
-                if (bufLineNum > lastPrintedLine)
-                {
-                    // Ex: lastPrintedLine = 10, bufLineNum = 11 -> bufLineNum annexes lastPrintedLine after it was printed
-                    std::println("{}[C:L{}] {}{}", CONTEXT_COLOR, bufLineNum, bufLine, RESET_COLOR);
-                    lastPrintedLine = bufLineNum;
-                }
-            }
-
-            // Step 3: Print the actual matching line (colored by log level)
-            LogLevel level = detect_log_level(line, options.logFormat);
-            auto color = get_log_level_color(level);
-            std::println("{}[{}:L{}] {}{}", color, matchCount, lineNumber, line, RESET_COLOR);
-            lastPrintedLine = lineNumber;
-            ++matchCount;
-
-            // Step 4: Set after context counter
-            // Set counter to print next N lines as context after the match
-            afterContextRemaining = options.afterContext;
-
-            // Step 5: Clear before buffer
-            // Since they are printed, we won't need them anymore. Let's kill them!
-            beforeBuffer.clear();
-
-            // Step 6: Reset separator flag, since we might have more matches right after
-            needsSeparator = true;
-        }
-
-        else if (afterContextRemaining > 0)
-        {
-            // After context processing
-            if (lineNumber > lastPrintedLine) // Deduplication check
-            {
-                std::println("{}[C:L{}] {}{}", CONTEXT_COLOR, lineNumber, line, RESET_COLOR);
-                lastPrintedLine = lineNumber;
-            }
-            
-            --afterContextRemaining; // Decrement counter 
-        }
-
-        else
-        {
-            // Store line in before buffer
-            if (options.beforeContext > 0)
-            {
-                beforeBuffer.push_back({lineNumber, line}); // O(1)
+                // Stack buffer to avoid heap allocations
+                char tsBuf[TIMESTAMP_PREFIX_LENGTH + 1];
+                memcpy(tsBuf, lineStart, TIMESTAMP_PREFIX_LENGTH);
+                tsBuf[TIMESTAMP_PREFIX_LENGTH] = '\0';
                 
-                // Maintain buffer size (sliding window)
-                // Ex: buffer size=3, we have 4 lines, pop the oldest (front)
-                // [line10, line11, line12] + line13 -> [line11, line12, line13]
-                if (static_cast<int>(beforeBuffer.size()) > options.beforeContext)
+                auto ts = parse_log_timestamp(tsBuf, dateFormat);
+                if (ts)
                 {
-                    beforeBuffer.pop_front(); // O(1)
+                    ++linesWithTimestamps;
+                    if (options.fromTime && *ts < *(options.fromTime))
+                        skipLine = true;
+                    else if (options.toTime && *ts > *(options.toTime))
+                        skipLine = true;
                 }
             }
         }
+
+        if (!skipLine)
+        {
+            bool found = false;
+
+            if (options.useRegex)
+            {
+                // Regex needs string (unavoidable copy)
+                std::string lineStr(lineView);
+                for (const auto& regexPattern : regexPatterns)
+                {
+                    if (std::regex_search(lineStr, regexPattern))
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                // Pure string_view matching - NO allocations!
+                for (const auto& pattern : options.searchPatterns)
+                {
+                    bool match = options.caseInsensitive 
+                        ? contains_case_insensitive(lineView, pattern) 
+                        : lineView.find(pattern) != std::string_view::npos;
+
+                    if (match)
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+            }
+
+            // Context handling
+            if (found)
+            {
+                if (needsSeparator && lastPrintedLine != -1 && lineNumber - lastPrintedLine > 1)
+                {
+                    std::cout << "--\n";
+                }
+
+                for (const auto& [bufLineNum, bufLine] : beforeBuffer)
+                {
+                    if (bufLineNum > lastPrintedLine)
+                    {
+                        std::cout << CONTEXT_COLOR << "[C:L" << bufLineNum << "] " << bufLine << RESET_COLOR << '\n';
+                        lastPrintedLine = bufLineNum;
+                    }
+                }
+
+                LogLevel level = detect_log_level(std::string(lineView), options.logFormat);
+                auto color = get_log_level_color(level);
+                std::cout << color << "[" << static_cast<int>(level) << ":L" << lineNumber << "] " << lineView << RESET_COLOR << '\n';
+                lastPrintedLine = lineNumber;
+                ++matchCount;
+
+                afterContextRemaining = options.afterContext;
+                beforeBuffer.clear();
+                needsSeparator = true;
+            }
+
+            else if (afterContextRemaining > 0)
+            {
+                if (lineNumber > lastPrintedLine)
+                {
+                    std::cout << CONTEXT_COLOR << "[C:L" << lineNumber << "] " << lineView << RESET_COLOR << '\n';
+                    lastPrintedLine = lineNumber;
+                }
+                --afterContextRemaining;
+            }
+
+            else
+            {
+                if (options.beforeContext > 0)
+                {
+                    beforeBuffer.push_back({lineNumber, std::string(lineView)});
+                    if (static_cast<int>(beforeBuffer.size()) > options.beforeContext)
+                    {
+                        beforeBuffer.pop_front();
+                    }
+                }
+            }
+        }
+
+        // Move to next line
+        lineStart = lineEnd + (lineEnd < fileEnd ? 1 : 0);
     }
+
+    // Cleanup of mapped memory
+    munmap(fileData, fileSize);
 
     // Warn user if date filtering was applied but no timestamps were found
     if ((options.fromTime || options.toTime) && linesWithTimestamps == 0)
     {
-        std::println(stderr, "");
-        std::println(stderr, "Warning: Date filtering was requested, but no valid timestamps were found in the log lines.");
+        std::cerr << '\n';
+        std::cerr << "Warning: Date filtering was requested, but no valid timestamps were found in the log lines." << std::endl;
     }
 
-    std::println("");
-    std::println("Total Matches: {}", matchCount);
+    std::cout << '\n';
+    std::cout << "Total Matches: " << matchCount << std::endl;
 
     return EXIT_SUCCESS;
 }

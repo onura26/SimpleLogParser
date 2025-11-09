@@ -1,13 +1,6 @@
 // src/date.cpp
 #include "date.h"
-#include <sstream>
-#include <iomanip>
-#include <regex>
-#include <ctime>
-#include <fstream>
-#include <format>
 
-// Detect the date format based on the input string
 LogDateFormat detect_date_format(const std::string& dateStr)
 {
     // Regex patterns for different date formats defined in enum LogDateFormat
@@ -32,7 +25,6 @@ LogDateFormat detect_date_format(const std::string& dateStr)
     return LogDateFormat::UNKNOWN; // Unknown or unsupported format
 }
 
-// Parse log timestamp based on detected format
 std::optional<std::chrono::system_clock::time_point> 
 parse_log_timestamp(std::string_view dateStr, LogDateFormat format)
 {
@@ -62,7 +54,6 @@ parse_log_timestamp(std::string_view dateStr, LogDateFormat format)
     return tp;
 }
 
-// Extract timestamp from a log line using pre-detected format
 std::optional<std::chrono::system_clock::time_point> extract_timestamp(const std::string& line, LogDateFormat format)
 {
     // Log timestamp length and format check

@@ -1,7 +1,6 @@
 // src/utils.cpp
 
 #include "utils.h"
-#include <algorithm>
 
 LogLevel detect_log_level(const std::string& line, const LogLevelConfig& config)
 {

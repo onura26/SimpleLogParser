@@ -5,6 +5,7 @@
 
 #include <string>
 #include <vector>
+#include <algorithm>
 
 // ANSI color codes for terminal text formatting
 constexpr const char* RED_COLOR = "\033[31m";
@@ -68,13 +69,42 @@ namespace LogFormats {
 
 inline const LogLevelConfig& DEFAULT_LOG_LEVEL_CONFIG = LogFormats::GENERIC;
 
-// Utility Functions
+/**
+ * Detects the log severity level from a line content.
+ * Scans line for keywords defined in config (case-insensitive).
+ * Checks in this order: FATAL -> ERROR -> WARNING -> INFO -> DEBUG.
+ * 
+ * @param line Log line to analyze.
+ * @param config Keyword patterns for each log level.
+ * @return Detected log level, or UNKNOWN if none matched.
+ */
 LogLevel detect_log_level(const std::string& line, const LogLevelConfig& config);
 
+/**
+ * Map log level to corresponding ANSI color code (for terminal output).
+ * FATAL/ERROR = Red, WARNING = Yellow, INFO = Green, DEBUG = Blue, UNKNOWN = Reset.
+ * 
+ * @param level Log level enum.
+ * @return ANSI escape sequence string for the color (must not be freed).
+ */
 const char* get_log_level_color(LogLevel level);
 
+/**
+ * Converts a string to lowercase.
+ * 
+ * @param str Input string.
+ * @return Lowercase version of the input string.
+ */
 std::string to_lower(const std::string& str);
 
+/**
+ * Lambda-style function to convert string to lowercase.
+ * Seaches case-insensitive substring with zero-copy string_view.
+ * 
+ * @param haystack String to search within.
+ * @param needle Substring to search for.
+ * @return true if needle found in haystack (case-insensitive), false otherwise
+ */
 bool contains_case_insensitive(std::string_view haystack, std::string_view needle);
 
 #endif // UTILS_H

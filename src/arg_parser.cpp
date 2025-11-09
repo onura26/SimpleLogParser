@@ -1,10 +1,6 @@
 // src/arg_parser.cpp
 
 #include "arg_parser.h"
-#include "date.h"
-#include "utils.h"
-#include <stdexcept>
-#include <regex>
 
 ProgramOptions parse_arguments(int argc, char* argv[])
 {
@@ -163,7 +159,7 @@ ProgramOptions parse_arguments(int argc, char* argv[])
         throw std::runtime_error("No search pattern(s) provided. At least one pattern is required.");
     }
 
-    // Regex pattern validation
+    // regex pattern validation
     if (options.useRegex)
     {
         for (const auto& pattern : options.searchPatterns)

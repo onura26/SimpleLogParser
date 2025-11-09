@@ -8,40 +8,47 @@ A command-line log parser written in C++ for filtering and analyzing log files.
 - Output colored by log level (ERROR=red, WARN=yellow, INFO=green, DEBUG=blue)
 - Case-insensitive search option with '-i' flag
 - Regular expression search with '-r' flag
-- Sustainable for large log files (Tested on a 322 MB log file)
+- Sustainable for large log files
 - Line numbers and match counting
 - Modular structure
+- Memory mapped file analysis
 
 ## Build
 
 **Using Make (recommended):**
+
 ```bash
 make
 ```
 
 **Manual compilation:**
+
 ```bash
-g++ -std=c++17 main.cpp src/*.cpp -o logparser
+g++ -std=c++20 main.cpp src/*.cpp -o logparser
 ```
 
 ## Usage
 
 **Basic Search**
+
 ```bash
 ./logparser <example_name>.log "ERROR"
 ```
 
 **Multiple Patterns**
+
 ```bash
 ./logparser server.log "ERROR" "WARNING" "INFO"
 ```
 
 **Case Insensitive**
+
 ```bash
 ./logparser server.log "error" "warning" -i
 ```
 
 **Regular Expression**
+
 ```bash
 ./logparser server.log "ERROR.*Payment" -r
 
@@ -58,6 +65,7 @@ g++ -std=c++17 main.cpp src/*.cpp -o logparser
 ```
 
 **Date Range Filtering** (New)
+
 ```bash
 # errors btw specific times
 ./logparser server.log "ERROR" -from "2025-10-21 08:30:00" -to "2025-10-21 09:00:00"
@@ -73,6 +81,7 @@ g++ -std=c++17 main.cpp src/*.cpp -o logparser
 ```
 
 **Supported Date Formats**
+
 - 'YYYY-MM-DD HH:MM:SS' (e.g., '2025-10-21 08:30:00')
 - 'DD-MM-YYYY HH:MM:SS' (e.g., '21-10-2025 08:30:00')
 - 'MM-DD-YYYY HH:MM:SS' (e.g., '10-21-2025 08:30:00')
@@ -80,6 +89,7 @@ g++ -std=c++17 main.cpp src/*.cpp -o logparser
 Lines without timestamps (stack traces, multi-line messages, etc.) are included if they match the search pattern, even if date filtering is enabled.
 
 **Log Format Support**
+
 ```bash
 # Specify log format for better detection
 ./logparser java.log "Exception" -f java
@@ -87,6 +97,7 @@ Lines without timestamps (stack traces, multi-line messages, etc.) are included 
 ```
 
 **Context Lines (grep-style)**
+
 ```bash
 # show 3 lines before and after each match
 ./logparser server.log "ERROR" -C 3
@@ -96,6 +107,7 @@ Lines without timestamps (stack traces, multi-line messages, etc.) are included 
 ```
 
 ## Example Output
+
 ```
 [0:L20] 2025-10-21 08:34:42.100 [ERROR] [SecurityService] Failed to notify admin: SMTP connection timeout
 --
@@ -107,13 +119,33 @@ Lines without timestamps (stack traces, multi-line messages, etc.) are included 
 Total Matches: 4
 ```
 
+## Performance Benchmark
+Tested on AMD Ryzen 5 3600 (single core), 16 GB RAM, Samsung NVMe SSD
+
+**Test file**: 2 GB log file with 21.7M lines
+
+| Test Case | Matches Found | Avg. Time | Throughput |
+|-----------|--------------|-----------|------------|
+| Basic pattern search | 1,675,799 | 13.4s | ~149 MB/s |
+| Regex search | 2,154,600 | 557s | ~3.6 MB/s |
+| Regex + case-insensitive | 2,154,600 | 642s | ~3.1 MB/s |
+| Date range filtering | 478,799 | 35.8s | ~56 MB/s |
+| Combined (regex+date+context) | 478,800 | 104s | ~19 MB/s |
+
+* Zero memory leaks detected with Valgrind
+* Peak heap usage was ~364 MB for 21.7M lines
+
+### Performance Notes
+- Due to the limitations of C++ stdlib regex, the regex feature is slow. Consider using basic search when possible. This will be addressed in the future versions.
+
 ## Roadmap
+
 - [x] Version 1.0 - Basic pattern search, colored display
 - [x] Version 1.1 - Case-insensitive search, regex support
 - [x] Version 1.2 - Date range filtering
 - [x] Version 1.3 - Context lines & log format support
 - [x] Version 1.4 - Zero allocation optimization, major bug fixes
-- [ ] Version 1.5
+- [x] Version 1.5 - Memory mapping, documentation & performance benchmarks 
 - [ ] Version 1.6
 - [ ] Version 1.7
 - [ ] Version 1.8
@@ -121,11 +153,13 @@ Total Matches: 4
 - [ ] Version 2.0
 
 ## Requirements
-- C++17 compiler (g++, clang++)
+
+- C++20 compiler (g++, clang++)
 - Linux/Unix terminal with ANSI color support
 
 ## Learning and Improvements
-Built this project as part of my systems programming learning journey, please feel free to give feedback for future improvements! 
+
+Built this project as part of my systems programming learning journey, please feel free to give feedback for future improvements!
 
 ## License
 
