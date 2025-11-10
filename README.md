@@ -137,6 +137,7 @@ Tested on AMD Ryzen 5 3600 (single core), 16 GB RAM, Samsung NVMe SSD
 
 ### Performance Notes
 - Due to the limitations of C++ stdlib regex, the regex feature is slow. Consider using basic search when possible. This will be addressed in the future versions.
+- The test results don't include the terminal display delay. 
 
 ## Roadmap
 
