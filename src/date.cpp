@@ -28,31 +28,35 @@ LogDateFormat detect_date_format(const std::string& dateStr)
 std::optional<std::chrono::system_clock::time_point> 
 parse_log_timestamp(std::string_view dateStr, LogDateFormat format)
 {
-    std::string dateString(dateStr); 
-    std::istringstream ss(dateString); // Input string stream for parsing
-    std::chrono::sys_seconds tp;
+    std::tm tm = {};
+    std::string dateString(dateStr);
+    std::istringstream ss(dateString);
 
     switch (format)
     {
         case LogDateFormat::YYYY_MM_DD_HH_MM_SS:
-            ss >> std::chrono::parse("%Y-%m-%d %H:%M:%S", tp);
+            ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
             break;
         case LogDateFormat::DD_MM_YYYY_HH_MM_SS:
-            ss >> std::chrono::parse("%d-%m-%Y %H:%M:%S", tp);
+            ss >> std::get_time(&tm, "%d-%m-%Y %H:%M:%S");
             break;
         case LogDateFormat::MM_DD_YYYY_HH_MM_SS:
-            ss >> std::chrono::parse("%m-%d-%Y %H:%M:%S", tp);
+            ss >> std::get_time(&tm, "%m-%d-%Y %H:%M:%S");
             break;
         default:
-            return std::nullopt; // Unsupported format
+            return std::nullopt;
     }
 
-    // Check if parsing was successful
     if (ss.fail())
         return std::nullopt;
 
-    return tp;
+    std::time_t tt = std::mktime(&tm);
+    if (tt == -1)
+        return std::nullopt;
+
+    return std::chrono::system_clock::from_time_t(tt);
 }
+
 
 std::optional<std::chrono::system_clock::time_point> extract_timestamp(const std::string& line, LogDateFormat format)
 {
